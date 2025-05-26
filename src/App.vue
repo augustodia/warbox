@@ -4,7 +4,9 @@ import { Warbox, type WarboxItem } from "./core/warbox";
 
 import WarboxIllustration from "./assets/warbox.svg";
 import Caixa from "./assets/caixa_w.svg";
-import { ComponentPublicInstance, onMounted, ref } from "vue";
+import { ComponentPublicInstance, onMounted, ref, watch, nextTick } from "vue";
+
+const modalItemElements = ref<Array<HTMLElement>>([]);
 
 const boxesRef = ref<
   Array<(ComponentPublicInstance & { timeoutFn?: number }) | null>
@@ -117,6 +119,39 @@ const closeItemsModal = () => {
   boxBuyed.value = 0;
 };
 
+watch(modalItemsOpen, async (isOpening) => {
+  if (isOpening) {
+    // Clear the refs array before new elements are added.
+    modalItemElements.value = [];
+    await nextTick(); // Wait for Vue to render the items in the modal
+
+    modalItemElements.value.forEach((itemElement, index) => {
+      if (!itemElement) return; 
+      
+      const item = itemsOfWarbox.value[index]; 
+      if (!item) return;
+
+      let animationClass = '';
+      let animationDuration = 0;
+
+      if (item.type === 'gold') {
+        animationClass = 'play-gold-animation';
+        animationDuration = 1500;
+      } else if (item.type === 'normal') {
+        animationClass = 'play-normal-animation';
+        animationDuration = 750;
+      }
+
+      if (animationClass) {
+        itemElement.classList.add(animationClass);
+        setTimeout(() => {
+          itemElement.classList.remove(animationClass);
+        }, animationDuration);
+      }
+    });
+  }
+});
+
 const openItemsModal = () => {
   if (itemsOfWarbox.value.length === 0) return;
 
@@ -226,10 +261,11 @@ const someCash = (price: number) => {
 
     <section v-if="modalItemsOpen" id="items-modal">
       <div
-        v-for="item in itemsOfWarbox"
-        :key="item.item"
+        v-for="(item, index) in itemsOfWarbox"
+        :key="item.item" /* Consider a more unique key if item.item can have duplicates being shown at once */
         class="card-item"
         :class="{ gold: item.type === 'gold', normal: item.type === 'normal' }"
+        :ref="el => { if (el) modalItemElements[index] = el as HTMLElement }"
       >
         <p>{{ item.item }}</p>
       </div>
@@ -556,6 +592,7 @@ main {
     rgba(205, 187, 23, 0.7595413165266106) 35%,
     rgba(154, 138, 5, 0) 100%
   );
+  /* animation: gold-item-animation 1.5s ease-in-out; */ /* Removed */
 }
 
 .card-item.normal {
@@ -566,6 +603,14 @@ main {
     rgba(5, 73, 94, 0.8883928571428571) 35%,
     rgba(0, 0, 0, 0) 100%
   );
+  /* animation: normal-item-animation 0.75s ease-in-out; */ /* Removed */
+}
+
+.card-item.play-gold-animation {
+  animation: gold-item-glow-effect 1.5s ease-in-out;
+}
+.card-item.play-normal-animation {
+  animation: normal-item-pulse-effect 0.75s ease-in-out;
 }
 
 .btn-close-modal-items {
@@ -587,5 +632,31 @@ main {
   font-size: 13px;
 
   color: #ff8634;
+}
+
+@keyframes gold-item-glow-effect { /* Renamed */
+  0% {
+    box-shadow: 0 0 5px 2px rgba(255, 215, 0, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 20px 10px rgba(255, 215, 0, 1);
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: 0 0 5px 2px rgba(255, 215, 0, 0.7);
+  }
+}
+
+@keyframes normal-item-pulse-effect { /* Renamed */
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+  }
 }
 </style>
